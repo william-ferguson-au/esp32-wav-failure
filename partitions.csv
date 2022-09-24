@@ -1,0 +1,20 @@
+# Name,             Type,  SubType, Offset,  Size,      Flags
+# bootloader?? Wrote 25,296 bytes (15,805 compressed) at 0x00001000
+
+# Wrote 3072 bytes (142 compressed) at 0x00008000
+# ? partition table bin?
+
+# 16k
+nvs,                data,   nvs,      0x9000,  0x4000
+
+# 8k Wrote 8192 bytes (31 compressed) at 0x0000d000
+otadata,            data,   ota,      0xd000,  0x2000
+
+# 1,310,720, Wrote 1,295,088 bytes (774,723 compressed)
+factory,            app,    factory,  0x10000, 0x140000
+
+ota_0,              app,    ota_0,    ,        0x140000
+ota_1,              app,    ota_1,    ,        0x140000
+
+# 65k Wrote 196608 bytes (52980 compressed) at 0x003d0000
+spiffs_partition,   data,   spiffs,   ,        0x030000
