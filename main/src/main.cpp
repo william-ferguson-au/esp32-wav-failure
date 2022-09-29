@@ -233,9 +233,16 @@ static esp_err_t load_wav_header(char* filename, wav_header_t* wav_header, FILE*
 }
 
 /**
- * Loads the wav file and plays it.
+ * 2 padded silences. Each one a full buffer.
+ *
+ * I (9233) maxima_main: Maxima loaded wav header - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=39ms free_heap=247628
+ * I (9245) maxima_main: play_wav_file - Start sample_rate=16000 free_heap=247628
+ * I (10394) maxima_main: play_wav_file - last chunk read nr_bytes_read=512 bytes_written=1024. Ceasing playback now
+ * I (10586) maxima_main: play_wav_file - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=1333ms free_heap=247872
+ *
+ * 512 bytes read
  */
-static void play_wav_file(char* filename) {
+static void play_wav_file1(char* filename) {
 
     FILE* f;
     wav_header_t wav_header;
@@ -275,6 +282,305 @@ static void play_wav_file(char* filename) {
     ESP_LOGI(TAG, "play_wav_file - Finish. filename=%s Elapsed time=%lldms free_heap=%d", filename, (esp_timer_get_time() / 1000 - start_ms), heap_caps_get_free_size(MALLOC_CAP_8BIT));
 }
 
+
+/**
+ * No padded silences.
+ *
+ * I (72066) maxima_main: Maxima loaded wav header - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=40ms free_heap=247628
+ * I (72078) maxima_main: play_wav_file - Start sample_rate=16000 free_heap=247628
+ * I (73227) maxima_main: play_wav_file - last chunk read nr_bytes_read=512 bytes_written=1024. Ceasing playback now
+ * I (73228) maxima_main: play_wav_file - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=1142ms free_heap=247872
+ *
+ * 512 bytes read
+ */
+static void play_wav_file2(char* filename) {
+
+    FILE* f;
+    wav_header_t wav_header;
+    ESP_ERROR_CHECK(load_wav_header(filename, &wav_header, &f));
+
+    // Set sample rate
+    ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, wav_header.SampleRate));   //set sample rate
+
+    // Read the data and send it to I2S to play
+    #define WAV_DATA_BUFFER_SIZE 1024
+    ESP_LOGI(TAG, "play_wav_file - Start sample_rate=%d free_heap=%d", wav_header.SampleRate, heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    char* data = (char*) malloc(WAV_DATA_BUFFER_SIZE);
+
+    const int64_t start_ms = esp_timer_get_time() / 1000;
+    uint32_t nr_bytes_written;
+    //ESP_ERROR_CHECK(i2s_start(i2s_num));
+    while (true) {
+        memset(data, 0, WAV_DATA_BUFFER_SIZE); // Clear buffer.
+        const uint32_t nr_bytes = fread(data, sizeof(char), WAV_DATA_BUFFER_SIZE, f);
+        if (nr_bytes == 0) {
+            break;
+        }
+        ESP_ERROR_CHECK(i2s_write(i2s_num, data, WAV_DATA_BUFFER_SIZE, &nr_bytes_written, portMAX_DELAY));
+        if (nr_bytes != WAV_DATA_BUFFER_SIZE) {
+            ESP_LOGI(TAG, "play_wav_file - last chunk read nr_bytes_read=%d bytes_written=%d. Ceasing playback now", nr_bytes, nr_bytes_written);
+            break;
+        }
+    }
+    fclose(f);
+    //ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_DISABLE)); // Disable channel at end of playback to avoid clicking noise. Taken from https://github.com/earlephilhower/ESP8266Audio/issues/406
+    //ESP_ERROR_CHECK(i2s_zero_dma_buffer(i2s_num)); // Fill dma buffer with zeroes until it is full.
+    //ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_stop(i2s_num)); // Stop i2s at end of playback to avoid clicking noise
+    free(data);
+
+    ESP_LOGI(TAG, "play_wav_file - Finish. filename=%s Elapsed time=%lldms free_heap=%d", filename, (esp_timer_get_time() / 1000 - start_ms), heap_caps_get_free_size(MALLOC_CAP_8BIT));
+}
+
+/**
+ * One padded silence.
+ *
+ * I (26041) maxima_main: Maxima loaded wav header - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=40ms free_heap=247628
+ * I (26053) maxima_main: play_wav_file - Start sample_rate=16000 free_heap=247628
+ * I (27202) maxima_main: play_wav_file - last chunk read nr_bytes_read=512 bytes_written=1024. Ceasing playback now
+ * I (27266) maxima_main: play_wav_file - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=1205ms free_heap=247872
+ *
+ * 512 bytes read !!!!
+ */
+static void play_wav_file3(char* filename) {
+
+    FILE* f;
+    wav_header_t wav_header;
+    ESP_ERROR_CHECK(load_wav_header(filename, &wav_header, &f));
+
+    // Set sample rate
+    ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, wav_header.SampleRate));   //set sample rate
+
+    // Read the data and send it to I2S to play
+    #define WAV_DATA_BUFFER_SIZE 1024
+    ESP_LOGI(TAG, "play_wav_file - Start sample_rate=%d free_heap=%d", wav_header.SampleRate, heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    char* data = (char*) malloc(WAV_DATA_BUFFER_SIZE);
+
+    const int64_t start_ms = esp_timer_get_time() / 1000;
+    uint32_t nr_bytes_written;
+    //ESP_ERROR_CHECK(i2s_start(i2s_num));
+    while (true) {
+        memset(data, 0, WAV_DATA_BUFFER_SIZE); // Clear buffer.
+        const uint32_t nr_bytes = fread(data, sizeof(char), WAV_DATA_BUFFER_SIZE, f);
+        if (nr_bytes == 0) {
+            break;
+        }
+        ESP_ERROR_CHECK(i2s_write(i2s_num, data, WAV_DATA_BUFFER_SIZE, &nr_bytes_written, portMAX_DELAY));
+        if (nr_bytes != WAV_DATA_BUFFER_SIZE) {
+            ESP_LOGI(TAG, "play_wav_file - last chunk read nr_bytes_read=%d bytes_written=%d. Ceasing playback now", nr_bytes, nr_bytes_written);
+            break;
+        }
+    }
+    fclose(f);
+    //ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_DISABLE)); // Disable channel at end of playback to avoid clicking noise. Taken from https://github.com/earlephilhower/ESP8266Audio/issues/406
+    //ESP_ERROR_CHECK(i2s_zero_dma_buffer(i2s_num)); // Fill dma buffer with zeroes until it is full.
+    //ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_stop(i2s_num)); // Stop i2s at end of playback to avoid clicking noise
+    free(data);
+
+    ESP_LOGI(TAG, "play_wav_file - Finish. filename=%s Elapsed time=%lldms free_heap=%d", filename, (esp_timer_get_time() / 1000 - start_ms), heap_caps_get_free_size(MALLOC_CAP_8BIT));
+}
+
+/**
+ * No padded silences. But reading full silence buffer each time.
+ *
+ * I (29936) maxima_main: Maxima loaded wav header - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=40ms free_heap=247628
+ * I (29948) maxima_main: play_wav_file - Start sample_rate=16000 free_heap=247628
+ * I (31097) maxima_main: play_wav_file - last chunk read nr_bytes_read=4352 bytes_written=8096. Ceasing playback now
+ * I (31098) maxima_main: play_wav_file - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=1141ms free_heap=247872
+ *
+ * 4352 bytes read !!!!
+ */
+static void play_wav_file4(char* filename) {
+
+    FILE* f;
+    wav_header_t wav_header;
+    ESP_ERROR_CHECK(load_wav_header(filename, &wav_header, &f));
+
+    // Set sample rate
+    ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, wav_header.SampleRate));   //set sample rate
+
+    // Read the data and send it to I2S to play
+    #define WAV_DATA_BUFFER_SIZE 8096
+    ESP_LOGI(TAG, "play_wav_file - Start sample_rate=%d free_heap=%d", wav_header.SampleRate, heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    char* data = (char*) malloc(WAV_DATA_BUFFER_SIZE);
+
+    const int64_t start_ms = esp_timer_get_time() / 1000;
+    uint32_t nr_bytes_written;
+    //ESP_ERROR_CHECK(i2s_start(i2s_num));
+    while (true) {
+        memset(data, 0, WAV_DATA_BUFFER_SIZE); // Clear buffer.
+        const uint32_t nr_bytes = fread(data, sizeof(char), WAV_DATA_BUFFER_SIZE, f);
+        if (nr_bytes == 0) {
+            break;
+        }
+        ESP_ERROR_CHECK(i2s_write(i2s_num, data, WAV_DATA_BUFFER_SIZE, &nr_bytes_written, portMAX_DELAY));
+        if (nr_bytes != WAV_DATA_BUFFER_SIZE) {
+            ESP_LOGI(TAG, "play_wav_file - last chunk read nr_bytes_read=%d bytes_written=%d. Ceasing playback now", nr_bytes, nr_bytes_written);
+            break;
+        }
+    }
+    fclose(f);
+    //ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_DISABLE)); // Disable channel at end of playback to avoid clicking noise. Taken from https://github.com/earlephilhower/ESP8266Audio/issues/406
+    //ESP_ERROR_CHECK(i2s_zero_dma_buffer(i2s_num)); // Fill dma buffer with zeroes until it is full.
+    //ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_stop(i2s_num)); // Stop i2s at end of playback to avoid clicking noise
+    free(data);
+
+    ESP_LOGI(TAG, "play_wav_file - Finish. filename=%s Elapsed time=%lldms free_heap=%d", filename, (esp_timer_get_time() / 1000 - start_ms), heap_caps_get_free_size(MALLOC_CAP_8BIT));
+}
+
+/**
+ * No padded silences. But reading full silence buffer each time.
+ * And only writing out those bytes that have been read.
+ *
+ * I (50234) maxima_main: Maxima loaded wav header - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=40ms free_heap=247628
+ * I (50246) maxima_main: play_wav_file - Start sample_rate=16000 free_heap=247628
+ * I (51331) maxima_main: play_wav_file - last chunk read nr_bytes_read=4352 bytes_written=4352. Ceasing playback now
+ * I (51332) maxima_main: play_wav_file - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=1077ms free_heap=247872
+ */
+static void play_wav_file5(char* filename) {
+
+    FILE* f;
+    wav_header_t wav_header;
+    ESP_ERROR_CHECK(load_wav_header(filename, &wav_header, &f));
+
+    // Set sample rate
+    ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, wav_header.SampleRate));   //set sample rate
+
+    // Read the data and send it to I2S to play
+    #define WAV_DATA_BUFFER_SIZE 8096
+    ESP_LOGI(TAG, "play_wav_file - Start sample_rate=%d free_heap=%d", wav_header.SampleRate, heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    char* data = (char*) malloc(WAV_DATA_BUFFER_SIZE);
+
+    const int64_t start_ms = esp_timer_get_time() / 1000;
+    uint32_t nr_bytes_written;
+    //ESP_ERROR_CHECK(i2s_start(i2s_num));
+    while (true) {
+        memset(data, 0, WAV_DATA_BUFFER_SIZE); // Clear buffer.
+        const uint32_t nr_bytes = fread(data, sizeof(char), WAV_DATA_BUFFER_SIZE, f);
+        if (nr_bytes == 0) {
+            break;
+        }
+        ESP_ERROR_CHECK(i2s_write(i2s_num, data, nr_bytes, &nr_bytes_written, portMAX_DELAY));
+        if (nr_bytes != WAV_DATA_BUFFER_SIZE) {
+            ESP_LOGI(TAG, "play_wav_file - last chunk read nr_bytes_read=%d bytes_written=%d. Ceasing playback now", nr_bytes, nr_bytes_written);
+            break;
+        }
+    }
+    fclose(f);
+    //ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_DISABLE)); // Disable channel at end of playback to avoid clicking noise. Taken from https://github.com/earlephilhower/ESP8266Audio/issues/406
+    //ESP_ERROR_CHECK(i2s_zero_dma_buffer(i2s_num)); // Fill dma buffer with zeroes until it is full.
+    //ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_stop(i2s_num)); // Stop i2s at end of playback to avoid clicking noise
+    free(data);
+
+    ESP_LOGI(TAG, "play_wav_file - Finish. filename=%s Elapsed time=%lldms free_heap=%d", filename, (esp_timer_get_time() / 1000 - start_ms), heap_caps_get_free_size(MALLOC_CAP_8BIT));
+}
+
+/**
+ * No padded silences. But reading full silence buffer each time.
+ * And only writing out those bytes that have been read.
+ * And then writing null bytes till the end of the next silence block.
+ *
+ * I (86000) maxima_main: Maxima loaded wav header - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=40ms free_heap=247628
+ * I (86012) maxima_main: play_wav_file - Start sample_rate=16000 free_heap=247628
+ * I (86969) maxima_main: play_wav_file - last chunk read nr_bytes_read=4352 bytes_written=4352. Ceasing playback now
+ * I (87033) maxima_main: play_wav_file - Finish. filename=/OYM-USA-male-1-16000.wav Elapsed time=1013ms free_heap=247872
+ */
+static void play_wav_file6(char* filename) {
+
+    FILE* f;
+    wav_header_t wav_header;
+    ESP_ERROR_CHECK(load_wav_header(filename, &wav_header, &f));
+
+    // Set sample rate
+    ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, wav_header.SampleRate));   //set sample rate
+
+    // Read the data and send it to I2S to play
+    #define WAV_DATA_BUFFER_SIZE 8096
+    ESP_LOGI(TAG, "play_wav_file - Start sample_rate=%d free_heap=%d", wav_header.SampleRate, heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    char* data = (char*) malloc(WAV_DATA_BUFFER_SIZE);
+
+    const int64_t start_ms = esp_timer_get_time() / 1000;
+    uint32_t nr_bytes_written;
+    uint32_t nr_bytes_read = fread(data, sizeof(char), WAV_DATA_BUFFER_SIZE, f);
+    //ESP_ERROR_CHECK(i2s_start(i2s_num));
+    while (true) {
+        memset(data, 0, WAV_DATA_BUFFER_SIZE); // Clear buffer.
+        nr_bytes_read = fread(data, sizeof(char), WAV_DATA_BUFFER_SIZE, f);
+        if (nr_bytes_read == 0) {
+            break;
+        }
+        ESP_ERROR_CHECK(i2s_write(i2s_num, data, nr_bytes_read, &nr_bytes_written, portMAX_DELAY));
+        if (nr_bytes_read != WAV_DATA_BUFFER_SIZE) {
+            ESP_LOGI(TAG, "play_wav_file - last chunk read nr_bytes_read=%d bytes_written=%d. Ceasing playback now", nr_bytes_read, nr_bytes_written);
+            break;
+        }
+    }
+    fclose(f);
+    //ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_DISABLE)); // Disable channel at end of playback to avoid clicking noise. Taken from https://github.com/earlephilhower/ESP8266Audio/issues/406
+    //ESP_ERROR_CHECK(i2s_zero_dma_buffer(i2s_num)); // Fill dma buffer with zeroes until it is full.
+    ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE - nr_bytes_read, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_stop(i2s_num)); // Stop i2s at end of playback to avoid clicking noise
+    free(data);
+
+    ESP_LOGI(TAG, "play_wav_file - Finish. filename=%s Elapsed time=%lldms free_heap=%d", filename, (esp_timer_get_time() / 1000 - start_ms), heap_caps_get_free_size(MALLOC_CAP_8BIT));
+}
+
+
+/**
+ * But reading full silence buffer each time.
+ * And only writing out those bytes that have been read.
+ * And then writing null bytes till the end of the next silence block.
+ * And then writing another full block of silence.
+ */
+static void play_wav_file7(char* filename) {
+
+    FILE* f;
+    wav_header_t wav_header;
+    ESP_ERROR_CHECK(load_wav_header(filename, &wav_header, &f));
+
+    // Set sample rate
+    ESP_ERROR_CHECK(i2s_set_sample_rates(i2s_num, wav_header.SampleRate));   //set sample rate
+
+    // Read the data and send it to I2S to play
+    #define WAV_DATA_BUFFER_SIZE 8096
+    ESP_LOGI(TAG, "play_wav_file - Start sample_rate=%d free_heap=%d", wav_header.SampleRate, heap_caps_get_free_size(MALLOC_CAP_8BIT));
+    char* data = (char*) malloc(WAV_DATA_BUFFER_SIZE);
+
+    const int64_t start_ms = esp_timer_get_time() / 1000;
+    uint32_t nr_bytes_written;
+    uint32_t nr_bytes_read = fread(data, sizeof(char), WAV_DATA_BUFFER_SIZE, f);
+    //ESP_ERROR_CHECK(i2s_start(i2s_num));
+    while (true) {
+        memset(data, 0, WAV_DATA_BUFFER_SIZE); // Clear buffer.
+        nr_bytes_read = fread(data, sizeof(char), WAV_DATA_BUFFER_SIZE, f);
+        if (nr_bytes_read == 0) {
+            break;
+        }
+        ESP_ERROR_CHECK(i2s_write(i2s_num, data, nr_bytes_read, &nr_bytes_written, portMAX_DELAY));
+        if (nr_bytes_read != WAV_DATA_BUFFER_SIZE) {
+            ESP_LOGI(TAG, "play_wav_file - last chunk read nr_bytes_read=%d bytes_written=%d. Ceasing playback now", nr_bytes_read, nr_bytes_written);
+            break;
+        }
+    }
+    fclose(f);
+    //ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_DISABLE)); // Disable channel at end of playback to avoid clicking noise. Taken from https://github.com/earlephilhower/ESP8266Audio/issues/406
+    //ESP_ERROR_CHECK(i2s_zero_dma_buffer(i2s_num)); // Fill dma buffer with zeroes until it is full.
+    ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE - nr_bytes_read, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    ESP_ERROR_CHECK(i2s_write(i2s_num, SILENCE, SILENCE_SIZE, &nr_bytes_written, portMAX_DELAY)); // Write zero bytes to try to flush the remaining sound before we stop the channel
+    //ESP_ERROR_CHECK(i2s_stop(i2s_num)); // Stop i2s at end of playback to avoid clicking noise
+    free(data);
+
+    ESP_LOGI(TAG, "play_wav_file - Finish. filename=%s Elapsed time=%lldms free_heap=%d", filename, (esp_timer_get_time() / 1000 - start_ms), heap_caps_get_free_size(MALLOC_CAP_8BIT));
+}
+
 void app_main(void) {
     ESP_LOGI(TAG, "Logger initialised");
 
@@ -285,7 +591,13 @@ void app_main(void) {
 
     // loop playing WAV then pause for 3 seconds, then play again.
     while (true) {
-        play_wav_file((char*) FILE_ON_YOUR_MARKS);
+        play_wav_file1((char*) FILE_ON_YOUR_MARKS); // Plays OnYourMark cleanly, no buzzes, clicks or trimmed sound bytes.
+        //play_wav_file2((char*) FILE_ON_YOUR_MARKS); // Plays "OnYourMark Mar" in each cycle
+        //play_wav_file3((char*) FILE_ON_YOUR_MARKS); // Plays "OnYourMark (soft click)" in each cycle
+        //play_wav_file4((char*) FILE_ON_YOUR_MARKS); // Plays "OnYourMark (hard click)" in each cycle
+        //play_wav_file5((char*) FILE_ON_YOUR_MARKS); // Plays "OnYourMark (double-click)" in each cycle
+        //play_wav_file6((char*) FILE_ON_YOUR_MARKS); // Plays "(soft click) OnYourMark (hard click)" in each cycle
+        //play_wav_file7((char*) FILE_ON_YOUR_MARKS); // Plays "(soft click) OnYourMark" in each cycle
         vTaskDelay(3000 / portTICK_PERIOD_MS);
     }
 }
