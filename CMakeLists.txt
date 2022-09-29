@@ -8,5 +8,5 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 SET (CMAKE_CXX_STANDARD 11)
 
-project(maxima-sound-test)
+project(wav-sound-test)
 

@@ -1,11 +1,3 @@
-/*
- * Maxima main.cpp
- *
- *  Created on: 1 Jan. 2018
- *      Author: William
- */
-
-
 #include <esp_log.h>
 #include <esp_spiffs.h>
 #include <driver/i2s.h>                       // Library of I2S routines, comes with ESP32 standard install
@@ -16,7 +8,7 @@ extern "C" {
     void app_main();
 }
 
-static const char *TAG = "maxima_main";
+static const char *TAG = "main";
 
 // Speakers I2S
 #define SPEAKER_BIT_CLOCK      GPIO_NUM_27  // The bit clock connection, goes to pin 27 of ESP32
