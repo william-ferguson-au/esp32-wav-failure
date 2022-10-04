@@ -660,6 +660,8 @@ void app_main(void) {
 
     while (true) {
 
+        // Raised issue at https://github.com/espressif/esp-idf/issues/9882
+
         /**
          * Loop
          * - Read WAV_DATA_BUFFER_SIZE
